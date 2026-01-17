@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Next.js
+.next
+
+# Playwright
+playwright-report/
+test-results/
+
+# AI
+.serena
+
+# DSL Generated Code (auto-generated, should not be committed)
+generated/
+generated-*/
+
+# Project specific
+question.log
+

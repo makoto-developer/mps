@@ -152,35 +152,89 @@ it('should grant 100 points for 10000 yen order', () => {
 
 ### Prerequisites
 
-- **JDK**: 11以上（推奨: JDK 17）
-- **JetBrains MPS**: 2023.2以降を推奨
-- **メモリ**: 最低4GB、推奨8GB以上
+- **Node.js**: 18以上（推奨: 20 LTS）
+- **npm**: 9以上
+- **PostgreSQL**: 14以上（ローカル開発の場合）
+- **Docker** (オプション): Docker Composeによるデプロイ用
 
-### Installation
+### Quick Start with Makefile
 
-#### 1. MPSのインストール
-
-```bash
-# 方法1: JetBrains Toolbox経由（推奨）
-# https://www.jetbrains.com/toolbox-app/ からToolboxをインストール
-# Toolbox内でMPSを検索してインストール
-
-# 方法2: 公式サイトから直接ダウンロード
-# https://www.jetbrains.com/mps/download/
-```
-
-#### 2. プロジェクトのクローン
+#### 1. クローンとセットアップ
 
 ```bash
 git clone https://github.com/makoto-developer/mps.git
 cd mps
+make setup
 ```
 
-#### 3. MPSでプロジェクトを開く
+#### 2. コード生成とデプロイ
 
-1. MPSを起動
-2. `Open` → このリポジトリのディレクトリを選択
-3. プロジェクトが読み込まれるまで待機
+```bash
+# オプション1: クイックスタート（推奨）
+make quickstart
+
+# オプション2: 段階的デプロイ
+make generate          # DSLからコード生成
+make deploy-setup      # 生成されたコードのセットアップ
+make migrate          # データベースマイグレーション
+make start            # サーバー起動
+```
+
+#### 3. Dockerを使用したデプロイ
+
+```bash
+# .envファイルを作成
+cp .env.example .env
+# .envを編集してデータベース設定を行う
+
+# Dockerでデプロイ
+make docker-deploy
+```
+
+### Makefileコマンド一覧
+
+```bash
+make help              # すべてのコマンドを表示
+
+# 基本コマンド
+make install           # 依存関係をインストール
+make build             # TypeScriptをビルド
+make setup             # install + build
+
+# コード生成
+make generate          # DSLからコード生成
+make deploy            # 生成 + セットアップ
+make full-deploy       # 完全デプロイ（生成 + セットアップ + マイグレーション + 起動）
+
+# データベース
+make migrate           # データベースマイグレーション実行
+
+# サーバー
+make start             # 開発サーバー起動
+make start-prod        # 本番サーバー起動
+
+# Docker
+make docker-build      # Dockerイメージビルド
+make docker-up         # Docker Composeでサービス起動
+make docker-down       # Docker Composeでサービス停止
+make docker-deploy     # Docker完全デプロイ
+
+# クリーンアップ
+make clean             # すべてをクリーン
+make clean-generated   # 生成されたファイルのみクリーン
+
+# 開発
+make test              # テスト実行
+make lint              # Linter実行
+make format            # コードフォーマット
+```
+
+### カスタムDSLファイルを使用
+
+```bash
+make generate DSL_FILE=examples/my-app.dsl OUTPUT_DIR=my-output
+make deploy-setup OUTPUT_DIR=my-output
+```
 
 ### 基本的な使い方
 

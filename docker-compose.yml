@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: drawing-app-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-drawingapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-drawingapp_password}
+      POSTGRES_DB: ${POSTGRES_DB:-drawingapp}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-drawingapp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Generated Application (when generated/package.json exists)
+  app:
+    build:
+      context: ./generated
+      dockerfile: ../Dockerfile.app
+    container_name: drawing-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-drawingapp}:${POSTGRES_PASSWORD:-drawingapp_password}@postgres:5432/${POSTGRES_DB:-drawingapp}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      PORT: ${APP_PORT:-3000}
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - ./generated:/app
+      - /app/node_modules
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+  # PGAdmin (optional, for database management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: drawing-app-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:

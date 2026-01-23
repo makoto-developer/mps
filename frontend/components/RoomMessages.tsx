@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { apiClient } from '@/lib/api-client'
+import { getSocket } from '@/lib/socket'
 
 interface RoomMessagesProps {
   roomId: string
@@ -57,6 +58,17 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
 
     try {
       const data = await apiClient.sendMessage(roomId, { content: newMessage })
+      
+      // Emit to other users via Socket.io
+      const socket = getSocket()
+      if (socket.connected) {
+        socket.emit('send-message', {
+          roomId,
+          message: data.message,
+        })
+      }
+
+      // Add to local messages
       setMessages((prev) => [...prev, data.message])
       setNewMessage('')
       scrollToBottom()
@@ -76,11 +88,27 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
   }
 
   useEffect(() => {
+    if (!roomId || !currentUser) return
+
+    // Load initial messages
     loadMessages()
-    // Auto-refresh every 3 seconds
-    const interval = setInterval(loadMessages, 3000)
-    return () => clearInterval(interval)
-  }, [roomId])
+
+    // Connect socket and join room
+    const socket = getSocket()
+    socket.connect()
+    socket.emit('join-room', roomId)
+
+    // Listen for new messages from other users
+    socket.on('new-message', (message: Message) => {
+      setMessages((prev) => [...prev, message])
+      scrollToBottom()
+    })
+
+    // Cleanup
+    return () => {
+      socket.off('new-message')
+    }
+  }, [roomId, currentUser])
 
   return (
     <div className="flex flex-col h-full">

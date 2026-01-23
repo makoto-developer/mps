@@ -90,9 +90,28 @@ export class DrawingController {
     try {
       const { roomId } = req.params;
       const userId = req.user?.id;
+      const userRole = req.user?.role;
 
       if (!userId) {
         res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      // Check if room exists and get room details
+      const room = await prisma.room.findUnique({
+        where: { id: roomId },
+      });
+
+      if (!room) {
+        res.status(404).json({ error: 'Room not found' });
+        return;
+      }
+
+      // Authorization: Only room creator or admin can clear strokes
+      if (room.createdById !== userId && userRole !== 'ADMIN') {
+        res.status(403).json({ 
+          error: 'Forbidden: Only the room creator or admin can clear the canvas' 
+        });
         return;
       }
 
@@ -103,6 +122,10 @@ export class DrawingController {
 
       res.json({ success: true });
     } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Internal server error' });
     }

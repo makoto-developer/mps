@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { apiClient } from '@/lib/api-client'
+import { getSocket } from '@/lib/socket'
 
 interface DrawingCanvasProps {
   roomId: string
@@ -136,15 +137,27 @@ export function DrawingCanvas({ roomId, currentUser }: DrawingCanvasProps) {
     setIsDrawing(false)
 
     try {
-      await apiClient.createStroke(roomId, {
+      const response = await apiClient.createStroke(roomId, {
         tool,
         color,
         width,
         points: currentStroke,
       })
 
+      // Emit to other users via Socket.io
+      const socket = getSocket()
+      if (socket.connected) {
+        socket.emit('draw-stroke', {
+          roomId,
+          stroke: response.stroke,
+        })
+      }
+
+      // Add to local strokes
+      setStrokes((prev) => [...prev, response.stroke])
+      redrawCanvas([...strokes, response.stroke])
+
       setCurrentStroke([])
-      await loadStrokes()
     } catch (err) {
       console.error('Failed to save stroke:', err)
     }
@@ -171,10 +184,31 @@ export function DrawingCanvas({ roomId, currentUser }: DrawingCanvasProps) {
   }
 
   useEffect(() => {
+    if (!roomId || !currentUser) return
+
+    // Load initial strokes
     loadStrokes()
-    const interval = setInterval(loadStrokes, 3000)
-    return () => clearInterval(interval)
-  }, [roomId])
+
+    // Connect socket and join room
+    const socket = getSocket()
+    socket.connect()
+    socket.emit('join-room', roomId)
+
+    // Listen for new strokes from other users
+    socket.on('stroke-drawn', (stroke: Stroke) => {
+      setStrokes((prev) => {
+        const updated = [...prev, stroke]
+        redrawCanvas(updated)
+        return updated
+      })
+    })
+
+    // Cleanup
+    return () => {
+      socket.emit('leave-room', roomId)
+      socket.off('stroke-drawn')
+    }
+  }, [roomId, currentUser])
 
   useEffect(() => {
     const canvas = canvasRef.current

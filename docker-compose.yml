@@ -1,6 +1,37 @@
-version: '3.8'
-
 services:
+  # Phoenix Signaling Server for WebRTC (port 22303)
+  phoenix:
+    build:
+      context: ./phoenix
+      dockerfile: Dockerfile
+    container_name: drawing-app-signaling
+    environment:
+      PHX_HOST: ${PHX_HOST:-localhost}
+      PHX_PORT: 22303
+      PHX_SECRET_KEY_BASE: ${PHX_SECRET_KEY_BASE:-dev_secret_key_base_min_64_bytes_long_for_development_purposes_only_change_in_prod}
+    ports:
+      - "22303:22303"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:22303/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # coturn TURN Server for NAT traversal (port 22304)
+  coturn:
+    image: coturn/coturn:4.6
+    container_name: drawing-app-turn
+    ports:
+      - "22304:22304/udp"
+      - "22304:22304/tcp"
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./logs/turn:/var/log/turnserver
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    restart: unless-stopped
+    profiles:
+      - turn
+
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
@@ -19,7 +50,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Generated Application (when generated/package.json exists)
+  # Generated Application (port 22301) - optional, requires 'make generate' first
   app:
     build:
       context: ./generated
@@ -31,16 +62,18 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-drawingapp}:${POSTGRES_PASSWORD:-drawingapp_password}@postgres:5432/${POSTGRES_DB:-drawingapp}
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
-      PORT: ${APP_PORT:-3000}
+      PORT: 22301
       NODE_ENV: ${NODE_ENV:-production}
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "22301:22301"
     volumes:
       - ./generated:/app
       - /app/node_modules
     command: sh -c "npx prisma migrate deploy && npm start"
+    profiles:
+      - generated
 
-  # PGAdmin (optional, for database management)
+  # PGAdmin (optional, port 22305)
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: drawing-app-pgadmin
@@ -48,7 +81,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
     ports:
-      - "${PGADMIN_PORT:-5050}:80"
+      - "22305:80"
     depends_on:
       - postgres
     profiles:

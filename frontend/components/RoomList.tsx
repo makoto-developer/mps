@@ -9,7 +9,7 @@ interface RoomListProps {
   onRoomSelect?: (roomId: string) => void
 }
 
-export function RoomList({ currentUser, refreshTrigger, onRoomSelect }: RoomListProps) {
+export function RoomList({ currentUser: _currentUser, refreshTrigger, onRoomSelect }: RoomListProps) {
   const [rooms, setRooms] = useState<Array<{ id: string; title: string; theme: string }>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')

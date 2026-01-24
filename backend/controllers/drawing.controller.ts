@@ -107,13 +107,7 @@ export class DrawingController {
         return;
       }
 
-      // Authorization: Only room creator or admin can clear strokes
-      if (room.createdById !== userId && userRole !== 'ADMIN') {
-        res.status(403).json({ 
-          error: 'Forbidden: Only the room creator or admin can clear the canvas' 
-        });
-        return;
-      }
+      // Note: Any authenticated user can clear the canvas for collaborative drawing
 
       // Delete all strokes for this room
       await prisma.drawingStroke.deleteMany({

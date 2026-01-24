@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { getSocket } from '@/lib/socket'
 
@@ -27,7 +27,11 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
   const [error, setError] = useState('')
   const messagesStartRef = useRef<HTMLDivElement>(null)
 
-  const loadMessages = async () => {
+  const scrollToTop = useCallback(() => {
+    messagesStartRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  const loadMessages = useCallback(async () => {
     if (!roomId) return
 
     setLoading(true)
@@ -46,7 +50,7 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [roomId, scrollToTop])
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,10 +87,6 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
     }
   }
 
-  const scrollToTop = () => {
-    messagesStartRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
   useEffect(() => {
     if (!roomId || !currentUser) return
 
@@ -108,7 +108,7 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
     return () => {
       socket.off('new-message')
     }
-  }, [roomId, currentUser])
+  }, [roomId, currentUser, loadMessages, scrollToTop])
 
   return (
     <div className="flex flex-col h-full">

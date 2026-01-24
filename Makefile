@@ -107,7 +107,168 @@ lint: ## Run linter
 	npm run lint
 	@echo "$(GREEN)✅ Linting completed$(NC)"
 
-# Docker commands
+# ===========================================
+# Application Start/Stop Commands
+# ===========================================
+
+install-deps: ## Install all dependencies
+	@echo "$(BLUE)📦 Installing dependencies...$(NC)"
+	@cd frontend && npm install
+	@cd backend && npm install
+	@echo "$(GREEN)✅ Dependencies installed$(NC)"
+
+up: ## Start all services (PostgreSQL, Phoenix, Backend, Frontend)
+	@echo "$(BLUE)🚀 Starting all services...$(NC)"
+	@mkdir -p logs
+	@echo ""
+	@echo "$(YELLOW)Starting Docker services (PostgreSQL, Phoenix)...$(NC)"
+	docker-compose up -d postgres phoenix
+	@echo ""
+	@echo "$(YELLOW)Waiting for PostgreSQL to be ready...$(NC)"
+	@sleep 3
+	@echo ""
+	@echo "$(YELLOW)Starting Backend (port 22301)...$(NC)"
+	@cd backend && PORT=22301 npm run dev >> ../logs/backend.log 2>&1 &
+	@sleep 2
+	@echo ""
+	@echo "$(YELLOW)Starting Frontend (port 22300)...$(NC)"
+	@cd frontend && npm run dev >> ../logs/frontend.log 2>&1 &
+	@echo ""
+	@echo "$(GREEN)✅ All services started!$(NC)"
+	@echo ""
+	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
+	@echo "$(GREEN)  Services:$(NC)"
+	@echo "    Frontend:  http://localhost:22300"
+	@echo "    Backend:   http://localhost:22301"
+	@echo "    Phoenix:   ws://localhost:22303"
+	@echo "    PostgreSQL: localhost:22302"
+	@echo ""
+	@echo "$(GREEN)  Logs:$(NC)"
+	@echo "    ./logs/frontend.log"
+	@echo "    ./logs/backend.log"
+	@echo "    make logs-phoenix  (Docker)"
+	@echo "    make logs-postgres (Docker)"
+	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
+
+up-all: ## Start all services including TURN and PGAdmin
+	@echo "$(BLUE)🚀 Starting all services (including TURN & PGAdmin)...$(NC)"
+	@mkdir -p logs/turn
+	docker-compose --profile turn --profile tools up -d
+	@sleep 3
+	@cd backend && npm run dev >> ../logs/backend.log 2>&1 &
+	@sleep 2
+	@cd frontend && npm run dev >> ../logs/frontend.log 2>&1 &
+	@echo ""
+	@echo "$(GREEN)✅ All services started!$(NC)"
+	@echo ""
+	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
+	@echo "$(GREEN)  Services:$(NC)"
+	@echo "    Frontend:  http://localhost:22300"
+	@echo "    Backend:   http://localhost:22301"
+	@echo "    Phoenix:   ws://localhost:22303"
+	@echo "    TURN:      turn:localhost:22304"
+	@echo "    PostgreSQL: localhost:22302"
+	@echo "    PGAdmin:   http://localhost:22305"
+	@echo ""
+	@echo "$(GREEN)  Logs:$(NC)"
+	@echo "    ./logs/frontend.log"
+	@echo "    ./logs/backend.log"
+	@echo "    ./logs/turn/turnserver.log"
+	@echo "    make logs-phoenix  (Docker)"
+	@echo "    make logs-postgres (Docker)"
+	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
+
+down: ## Stop all services
+	@echo "$(BLUE)🛑 Stopping all services...$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Stopping Node.js processes...$(NC)"
+	-@pkill -f "next dev" 2>/dev/null || true
+	-@pkill -f "ts-node" 2>/dev/null || true
+	-@pkill -f "node.*backend" 2>/dev/null || true
+	@echo ""
+	@echo "$(YELLOW)Stopping Docker services...$(NC)"
+	docker-compose --profile turn --profile tools down
+	@echo ""
+	@echo "$(GREEN)✅ All services stopped$(NC)"
+
+restart: down up ## Restart all services
+	@echo "$(GREEN)✅ All services restarted$(NC)"
+
+logs: ## Show all logs (tail)
+	@echo "$(BLUE)📋 Showing all logs...$(NC)"
+	@echo ""
+	@echo "$(YELLOW)=== Frontend ===$(NC)"
+	@tail -20 logs/frontend.log 2>/dev/null || echo "No frontend logs yet"
+	@echo ""
+	@echo "$(YELLOW)=== Backend ===$(NC)"
+	@tail -20 logs/backend.log 2>/dev/null || echo "No backend logs yet"
+	@echo ""
+	@echo "$(YELLOW)=== Phoenix (Docker) ===$(NC)"
+	@docker-compose logs --tail=20 phoenix 2>/dev/null || echo "Phoenix not running"
+	@echo ""
+	@echo "$(YELLOW)=== PostgreSQL (Docker) ===$(NC)"
+	@docker-compose logs --tail=20 postgres 2>/dev/null || echo "PostgreSQL not running"
+
+logs-follow: ## Follow all Docker logs
+	docker-compose logs -f
+
+logs-phoenix: ## Show Phoenix logs
+	docker-compose logs -f phoenix
+
+logs-postgres: ## Show PostgreSQL logs
+	docker-compose logs -f postgres
+
+logs-frontend: ## Follow frontend logs
+	@tail -f logs/frontend.log
+
+logs-backend: ## Follow backend logs
+	@tail -f logs/backend.log
+
+logs-export: ## Export all logs to ./logs directory
+	@echo "$(BLUE)📦 Exporting all logs to ./logs...$(NC)"
+	@mkdir -p logs
+	@docker-compose logs phoenix > logs/phoenix.log 2>&1 || true
+	@docker-compose logs postgres > logs/postgres.log 2>&1 || true
+	@docker-compose logs coturn > logs/coturn.log 2>&1 || true
+	@docker-compose logs pgadmin > logs/pgadmin.log 2>&1 || true
+	@echo "$(GREEN)✅ Logs exported to ./logs/$(NC)"
+	@ls -la logs/
+
+logs-clear: ## Clear all logs
+	@echo "$(BLUE)🧹 Clearing all logs...$(NC)"
+	@rm -f logs/*.log
+	@rm -f logs/turn/*.log 2>/dev/null || true
+	@echo "$(GREEN)✅ Logs cleared$(NC)"
+
+logs-errors: ## Show only errors from all logs
+	@echo "$(RED)=== Errors ===$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Frontend:$(NC)"
+	@grep -i "error\|fail\|exception" logs/frontend.log 2>/dev/null | tail -10 || echo "No errors"
+	@echo ""
+	@echo "$(YELLOW)Backend:$(NC)"
+	@grep -i "error\|fail\|exception" logs/backend.log 2>/dev/null | tail -10 || echo "No errors"
+	@echo ""
+	@echo "$(YELLOW)Phoenix:$(NC)"
+	@docker-compose logs phoenix 2>/dev/null | grep -i "error\|fail\|exception" | tail -10 || echo "No errors"
+	@echo ""
+	@echo "$(YELLOW)PostgreSQL:$(NC)"
+	@docker-compose logs postgres 2>/dev/null | grep -i "error\|fail\|exception" | tail -10 || echo "No errors"
+
+ps: ## Show running services status
+	@echo "$(BLUE)📊 Service Status$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Docker Services:$(NC)"
+	@docker-compose ps
+	@echo ""
+	@echo "$(YELLOW)Node.js Processes:$(NC)"
+	@ps aux | grep -E "(next dev|ts-node|node.*backend)" | grep -v grep || echo "  No Node.js processes running"
+	@echo ""
+
+# ===========================================
+# Docker Commands
+# ===========================================
+
 docker-build: ## Build Docker image
 	@echo "$(BLUE)🐳 Building Docker image...$(NC)"
 	docker build -t drawing-app-dsl:latest .

@@ -45,13 +45,18 @@ class APIClient {
     const url = `${API_BASE_URL}${endpoint}`
     const token = this.getAuthToken()
 
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options?.headers,
     }
 
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
+    }
+
+    // Merge with any additional headers from options
+    if (options?.headers) {
+      const optHeaders = options.headers as Record<string, string>
+      Object.assign(headers, optHeaders)
     }
 
     const response = await fetch(url, {
@@ -95,6 +100,10 @@ class APIClient {
 
   async getRooms() {
     return this.fetch('/api/rooms')
+  }
+
+  async getRoom(roomId: string) {
+    return this.fetch(`/api/rooms/${roomId}`)
   }
 
   async createRoom(data: { title: string; theme: string }) {

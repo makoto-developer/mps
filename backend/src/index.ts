@@ -13,7 +13,7 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 22301;
 
 // Socket.io setup
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3001'];
@@ -82,9 +82,41 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('user-left', { socketId: socket.id });
   });
 
-  // Real-time drawing
+  // Real-time drawing - stroke start
+  socket.on('stroke-start', (data: { roomId: string; strokeId: string; userId: string; tool: string; color: string; width: number; point: { x: number; y: number } }) => {
+    socket.to(data.roomId).emit('stroke-started', {
+      strokeId: data.strokeId,
+      userId: data.userId,
+      tool: data.tool,
+      color: data.color,
+      width: data.width,
+      point: data.point,
+    });
+  });
+
+  // Real-time drawing - stroke point (during drawing)
+  socket.on('stroke-point', (data: { roomId: string; strokeId: string; point: { x: number; y: number } }) => {
+    socket.to(data.roomId).emit('stroke-pointed', {
+      strokeId: data.strokeId,
+      point: data.point,
+    });
+  });
+
+  // Real-time drawing - stroke end
+  socket.on('stroke-end', (data: { roomId: string; strokeId: string }) => {
+    socket.to(data.roomId).emit('stroke-ended', {
+      strokeId: data.strokeId,
+    });
+  });
+
+  // Completed stroke (for persistence)
   socket.on('draw-stroke', (data: { roomId: string; stroke: any }) => {
     socket.to(data.roomId).emit('stroke-drawn', data.stroke);
+  });
+
+  // Canvas cleared
+  socket.on('canvas-clear', (data: { roomId: string }) => {
+    socket.to(data.roomId).emit('canvas-cleared');
   });
 
   // Real-time chat

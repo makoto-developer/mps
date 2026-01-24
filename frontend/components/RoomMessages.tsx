@@ -25,7 +25,7 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesStartRef = useRef<HTMLDivElement>(null)
 
   const loadMessages = async () => {
     if (!roomId) return
@@ -36,7 +36,7 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
     try {
       const data = await apiClient.getMessages(roomId)
       setMessages(data.messages || [])
-      scrollToBottom()
+      scrollToTop()
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message || 'Failed to load messages')
@@ -71,7 +71,7 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
       // Add to local messages
       setMessages((prev) => [...prev, data.message])
       setNewMessage('')
-      scrollToBottom()
+      scrollToTop()
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message || 'Failed to send message')
@@ -83,8 +83,8 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
     }
   }
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  const scrollToTop = () => {
+    messagesStartRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
     // Listen for new messages from other users
     socket.on('new-message', (message: Message) => {
       setMessages((prev) => [...prev, message])
-      scrollToBottom()
+      scrollToTop()
     })
 
     // Cleanup
@@ -130,13 +130,14 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
       )}
 
       <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg p-4 mb-4 space-y-3 max-h-96">
+        <div ref={messagesStartRef} />
         {messages.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             <p>No messages yet</p>
             <p className="text-sm mt-1">Be the first to say something!</p>
           </div>
         ) : (
-          messages.map((message) => (
+          [...messages].reverse().map((message) => (
             <div
               key={message.id}
               className={`flex ${
@@ -161,7 +162,7 @@ export function RoomMessages({ roomId, currentUser }: RoomMessagesProps) {
             </div>
           ))
         )}
-        <div ref={messagesEndRef} />
+        
       </div>
 
       {currentUser ? (

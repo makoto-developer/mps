@@ -125,9 +125,5 @@ export class DrawingController {
       console.error(error);
       res.status(500).json({ error: 'Internal server error' });
     }
-  } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
   }
 }

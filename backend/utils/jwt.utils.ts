@@ -6,7 +6,7 @@ interface JwtPayload {
   role: string;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET as string;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 if (!JWT_SECRET) {
@@ -15,14 +15,14 @@ if (!JWT_SECRET) {
 
 export function generateToken(payload: JwtPayload): string {
   return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-  });
+    expiresIn: JWT_EXPIRES_IN as string,
+  } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): JwtPayload {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return decoded as JwtPayload;
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    return decoded;
   } catch (error) {
     throw new Error('Invalid or expired token');
   }

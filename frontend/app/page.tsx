@@ -93,21 +93,20 @@ export default function Home() {
               </section>
 
 {selectedRoomId && (
-                <>
-                  <section className="bg-white rounded-xl shadow-lg p-8 md:col-span-2">
-                    <h2 className="text-2xl font-bold mb-6 text-gray-800">
-                      Drawing Canvas
-                    </h2>
-                    <DrawingCanvas roomId={selectedRoomId} currentUser={currentUser} />
-                  </section>
-
-                  <section className="bg-white rounded-xl shadow-lg p-8 md:col-span-2">
-                    <h2 className="text-2xl font-bold mb-6 text-gray-800">
-                      Room Chat
-                    </h2>
-                    <RoomMessages roomId={selectedRoomId} currentUser={currentUser} />
-                  </section>
-                </>
+                <section className="bg-white rounded-xl shadow-lg p-8 md:col-span-2">
+                  <h2 className="text-2xl font-bold mb-6 text-gray-800">
+                    Drawing Room
+                  </h2>
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-700 mb-4">Canvas</h3>
+                      <DrawingCanvas roomId={selectedRoomId} currentUser={currentUser} />
+                    </div>
+                    <div className="lg:w-80 flex-shrink-0">
+                      <RoomMessages roomId={selectedRoomId} currentUser={currentUser} />
+                    </div>
+                  </div>
+                </section>
               )}
             </>
           )}

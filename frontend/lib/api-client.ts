@@ -67,8 +67,21 @@ class APIClient {
     return response.json()
   }
 
-  async registerUser(data: { email: string; nickname: string }) {
+  async registerUser(data: { email: string; password: string; nickname: string }) {
     const result = await this.fetch('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+
+    if (result.success && result.user && result.token) {
+      this.setCurrentUser(result.user, result.token)
+    }
+
+    return result
+  }
+
+  async loginUser(data: { email: string; password: string }) {
+    const result = await this.fetch('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     })

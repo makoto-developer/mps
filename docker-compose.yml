@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-drawingapp_password}
       POSTGRES_DB: ${POSTGRES_DB:-drawingapp}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "22302:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

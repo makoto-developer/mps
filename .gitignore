@@ -66,3 +66,7 @@ Cargo.lock
 phoenix/_build/
 phoenix/deps/
 phoenix/native/*/target/
+
+# Task
+task*.md
+

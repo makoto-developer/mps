@@ -1,0 +1,375 @@
+# mise configuration - https://mise.jdx.dev/
+# Run `mise install` to install all tools
+
+[tools]
+node = "20"
+erlang = "26.2"
+elixir = "1.15"
+rust = "1.75"
+
+[env]
+# Default environment variables
+DSL_FILE = "examples/minimal-test.dsl"
+OUTPUT_DIR = "generated"
+APP_PORT = "3000"
+
+# ===========================================
+# Setup & Build
+# ===========================================
+
+[tasks.setup]
+description = "Install all dependencies"
+run = """
+#!/usr/bin/env bash
+set -e
+echo "📦 Installing dependencies..."
+
+# Frontend
+cd frontend && npm install && cd ..
+
+# Backend
+cd backend && npm install && cd ..
+
+# Phoenix
+cd phoenix && mix deps.get && cd ..
+
+echo "✅ All dependencies installed"
+"""
+
+[tasks.build]
+description = "Build all projects"
+run = """
+#!/usr/bin/env bash
+set -e
+echo "🔨 Building projects..."
+
+# Frontend
+cd frontend && npm run build && cd ..
+
+# Phoenix (compile Rust NIF)
+cd phoenix && mix compile && cd ..
+
+echo "✅ Build completed"
+"""
+
+# ===========================================
+# Docker Services
+# ===========================================
+
+[tasks.up]
+description = "Start all Docker services"
+run = """
+#!/usr/bin/env bash
+set -e
+echo "🚀 Starting Docker services..."
+docker-compose up -d postgres phoenix
+echo ""
+echo "✅ Services started!"
+echo ""
+echo "  Phoenix:    http://localhost:22303"
+echo "  PostgreSQL: localhost:22302"
+"""
+
+[tasks.up-all]
+description = "Start all services including TURN and PGAdmin"
+run = """
+#!/usr/bin/env bash
+set -e
+docker-compose --profile turn --profile tools up -d
+echo "✅ All services started"
+echo ""
+echo "  Phoenix:    http://localhost:22303"
+echo "  PostgreSQL: localhost:22302"
+echo "  TURN:       turn:localhost:22304"
+echo "  PGAdmin:    http://localhost:22305"
+"""
+
+[tasks.down]
+description = "Stop all Docker services"
+run = """
+#!/usr/bin/env bash
+docker-compose --profile turn --profile tools down
+echo "✅ All services stopped"
+"""
+
+[tasks.restart]
+description = "Restart all services"
+depends = ["down", "up"]
+
+[tasks.ps]
+description = "Show running services status"
+run = """
+#!/usr/bin/env bash
+echo "📊 Service Status"
+echo ""
+docker-compose ps
+"""
+
+# ===========================================
+# Development
+# ===========================================
+
+[tasks.dev]
+description = "Start development servers (Frontend + Backend)"
+run = """
+#!/usr/bin/env bash
+set -e
+mkdir -p logs
+
+echo "🚀 Starting development servers..."
+echo ""
+
+# Start backend
+cd backend && PORT=22301 npm run dev >> ../logs/backend.log 2>&1 &
+echo "  Backend starting on port 22301..."
+
+# Start frontend
+cd frontend && npm run dev >> ../logs/frontend.log 2>&1 &
+echo "  Frontend starting on port 22300..."
+
+echo ""
+echo "✅ Development servers started!"
+echo ""
+echo "  Frontend: http://localhost:22300"
+echo "  Backend:  http://localhost:22301"
+echo ""
+echo "  Logs: ./logs/frontend.log, ./logs/backend.log"
+"""
+
+[tasks.dev-frontend]
+description = "Start frontend development server"
+run = "cd frontend && npm run dev"
+
+[tasks.dev-backend]
+description = "Start backend development server"
+run = "cd backend && PORT=22301 npm run dev"
+
+[tasks.dev-phoenix]
+description = "Start Phoenix development server"
+run = "cd phoenix && mix phx.server"
+
+# ===========================================
+# Code Generation (DSL)
+# ===========================================
+
+[tasks.generate]
+description = "Generate code from DSL file"
+run = """
+#!/usr/bin/env bash
+set -e
+DSL_FILE="${DSL_FILE:-examples/minimal-test.dsl}"
+OUTPUT_DIR="${OUTPUT_DIR:-generated}"
+
+echo "⚙️  Generating code from $DSL_FILE..."
+npm run build
+node dist/cli/index.js generate "$DSL_FILE" -o "$OUTPUT_DIR"
+echo "✅ Code generated to $OUTPUT_DIR"
+"""
+
+[tasks.deploy-setup]
+description = "Setup generated project"
+depends = ["generate"]
+run = """
+#!/usr/bin/env bash
+set -e
+OUTPUT_DIR="${OUTPUT_DIR:-generated}"
+
+echo "📦 Setting up generated project..."
+cd "$OUTPUT_DIR" && npm install
+
+if [ ! -f .env ]; then
+    cp .env.example .env
+    echo "⚠️  Created .env from .env.example - please edit it"
+fi
+
+echo "✅ Generated project setup completed"
+"""
+
+[tasks.migrate]
+description = "Run database migrations"
+run = """
+#!/usr/bin/env bash
+set -e
+OUTPUT_DIR="${OUTPUT_DIR:-generated}"
+
+if [ ! -f "$OUTPUT_DIR/.env" ]; then
+    echo "❌ .env file not found in $OUTPUT_DIR"
+    exit 1
+fi
+
+echo "🗄️  Running migrations..."
+cd "$OUTPUT_DIR" && npx prisma generate && npx prisma migrate dev --name init
+echo "✅ Migrations completed"
+"""
+
+# ===========================================
+# Testing
+# ===========================================
+
+[tasks.test]
+description = "Run all tests"
+run = """
+#!/usr/bin/env bash
+set -e
+echo "🧪 Running tests..."
+
+# Frontend tests
+cd frontend && npm test 2>/dev/null || echo "No frontend tests"
+
+# Phoenix tests
+cd ../phoenix && mix test
+
+echo "✅ Tests completed"
+"""
+
+[tasks.test-phoenix]
+description = "Run Phoenix tests"
+run = "cd phoenix && mix test"
+
+[tasks.test-frontend]
+description = "Run frontend tests"
+run = "cd frontend && npm test"
+
+# ===========================================
+# Linting & Formatting
+# ===========================================
+
+[tasks.lint]
+description = "Run linters"
+run = """
+#!/usr/bin/env bash
+echo "🔍 Running linters..."
+cd frontend && npm run lint
+echo "✅ Linting completed"
+"""
+
+[tasks.format]
+description = "Format code"
+run = """
+#!/usr/bin/env bash
+echo "✨ Formatting code..."
+cd frontend && npx prettier --write "**/*.{ts,tsx,js,jsx}"
+cd ../phoenix && mix format
+echo "✅ Code formatted"
+"""
+
+# ===========================================
+# Logs
+# ===========================================
+
+[tasks.logs]
+description = "Show all logs"
+run = """
+#!/usr/bin/env bash
+echo "📋 Recent logs..."
+echo ""
+echo "=== Frontend ==="
+tail -20 logs/frontend.log 2>/dev/null || echo "No frontend logs"
+echo ""
+echo "=== Backend ==="
+tail -20 logs/backend.log 2>/dev/null || echo "No backend logs"
+echo ""
+echo "=== Phoenix ==="
+docker-compose logs --tail=20 phoenix 2>/dev/null || echo "Phoenix not running"
+"""
+
+[tasks.logs-phoenix]
+description = "Follow Phoenix logs"
+run = "docker-compose logs -f phoenix"
+
+[tasks.logs-postgres]
+description = "Follow PostgreSQL logs"
+run = "docker-compose logs -f postgres"
+
+[tasks.logs-clear]
+description = "Clear all logs"
+run = """
+#!/usr/bin/env bash
+rm -f logs/*.log
+echo "✅ Logs cleared"
+"""
+
+# ===========================================
+# Docker Build
+# ===========================================
+
+[tasks.docker-build]
+description = "Build Docker images"
+run = """
+#!/usr/bin/env bash
+set -e
+echo "🐳 Building Docker images..."
+docker-compose build
+echo "✅ Docker images built"
+"""
+
+[tasks.docker-build-phoenix]
+description = "Rebuild Phoenix Docker image"
+run = """
+#!/usr/bin/env bash
+set -e
+echo "🐳 Building Phoenix image..."
+docker-compose build --no-cache phoenix
+echo "✅ Phoenix image built"
+"""
+
+# ===========================================
+# Cleanup
+# ===========================================
+
+[tasks.clean]
+description = "Clean all build artifacts"
+run = """
+#!/usr/bin/env bash
+echo "🧹 Cleaning..."
+rm -rf generated dist node_modules
+rm -rf frontend/node_modules frontend/.next
+rm -rf backend/node_modules backend/dist
+rm -rf phoenix/_build phoenix/deps
+rm -rf logs/*.log
+echo "✅ Cleaned"
+"""
+
+[tasks.clean-generated]
+description = "Clean only generated files"
+run = """
+#!/usr/bin/env bash
+rm -rf generated generated-*
+echo "✅ Generated files cleaned"
+"""
+
+# ===========================================
+# Quick Commands
+# ===========================================
+
+[tasks.quickstart]
+description = "Quick start: setup + docker up"
+depends = ["setup", "up"]
+run = """
+echo ""
+echo "✅ Quick start completed!"
+echo ""
+echo "Next: mise run dev"
+"""
+
+[tasks.health]
+description = "Check health of all services"
+run = """
+#!/usr/bin/env bash
+echo "🏥 Health Check"
+echo ""
+
+# Phoenix
+if curl -s http://localhost:22303/api/health > /dev/null 2>&1; then
+    echo "✅ Phoenix: healthy"
+else
+    echo "❌ Phoenix: not responding"
+fi
+
+# PostgreSQL
+if docker-compose exec -T postgres pg_isready > /dev/null 2>&1; then
+    echo "✅ PostgreSQL: healthy"
+else
+    echo "❌ PostgreSQL: not responding"
+fi
+"""

@@ -392,9 +392,17 @@ protocol MPSBinaryFormat {
 
 ### 必要環境
 
-- Node.js 18+
+- [mise](https://mise.jdx.dev/) - 言語バージョン管理
 - Docker & Docker Compose
 - （オプション）JetBrains MPS 2023.2+
+
+**mise がインストールする言語:**
+| 言語 | バージョン |
+|-----|-----------|
+| Node.js | 20 |
+| Elixir | 1.15 |
+| Erlang | 26.2 |
+| Rust | 1.75 |
 
 ### 起動手順
 
@@ -403,13 +411,17 @@ protocol MPSBinaryFormat {
 git clone https://github.com/makoto-developer/mps.git
 cd mps
 
-# 2. 環境変数設定
+# 2. mise で言語をインストール
+mise install
+
+# 3. 環境変数設定
 cp .env.example .env
 
-# 3. Docker起動
-docker-compose up -d
+# 4. セットアップ & 起動
+mise run setup
+mise run up
 
-# 4. 確認
+# 5. 確認
 curl http://localhost:22303/api/health
 # {"status":"ok","service":"signaling"}
 ```
@@ -424,13 +436,17 @@ curl http://localhost:22303/api/health
 | 22304 | TURN Server |
 | 22305 | PGAdmin |
 
-### Makefileコマンド
+### mise コマンド
 
 ```bash
-make help           # コマンド一覧
-make setup          # 初期セットアップ
-make docker-deploy  # Docker完全デプロイ
-make test           # テスト実行
+mise install          # 言語インストール (Node, Elixir, Rust)
+mise run setup        # 依存関係インストール
+mise run up           # Docker サービス起動
+mise run dev          # 開発サーバー起動
+mise run test         # テスト実行
+mise run logs         # ログ表示
+mise run down         # サービス停止
+mise tasks            # 全コマンド一覧
 ```
 
 ---

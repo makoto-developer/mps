@@ -49,3 +49,20 @@ generated-*/
 # Project specific
 question.log
 
+
+# Elixir/Phoenix
+_build/
+deps/
+*.ez
+*.beam
+.fetch
+erl_crash.dump
+
+# Rust
+target/
+Cargo.lock
+
+# Phoenix specific
+phoenix/_build/
+phoenix/deps/
+phoenix/native/*/target/

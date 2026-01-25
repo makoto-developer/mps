@@ -55,6 +55,8 @@ export interface Stroke {
   color: string
   width: number
   points: Point[]
+  createdAt?: string | Date
+  userId?: string
   user: {
     id: string
     nickname: string

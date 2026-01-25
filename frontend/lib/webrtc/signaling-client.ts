@@ -14,8 +14,8 @@ import type {
   PeerLeftMessage,
   PeerListMessage,
   WebRTCConfig,
-  DEFAULT_WEBRTC_CONFIG,
 } from './types';
+import { DEFAULT_WEBRTC_CONFIG } from './types';
 
 type SignalingEventHandler = {
   onPeerList: (peers: Peer[]) => void;

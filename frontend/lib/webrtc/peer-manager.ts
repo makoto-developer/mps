@@ -7,7 +7,8 @@
 
 import { SignalingClient } from './signaling-client';
 import { DataChannelWrapper, DEFAULT_CHANNEL_CONFIG } from './data-channel';
-import type { Peer, ICEServerConfig, WebRTCConfig, DEFAULT_WEBRTC_CONFIG } from './types';
+import type { Peer, ICEServerConfig, WebRTCConfig } from './types';
+import { DEFAULT_WEBRTC_CONFIG } from './types';
 
 const DRAWING_CHANNEL_LABEL = 'drawing';
 

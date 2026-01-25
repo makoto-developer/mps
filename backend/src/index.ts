@@ -3,10 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import authenticationRouter from '../routes/authentication.routes';
-import roomsRouter from '../routes/rooms.routes';
-import messagesRouter from '../routes/messages.routes';
-import drawingRouter from '../routes/drawing.routes';
+import authenticationRouter from './routes/authentication.routes';
+import roomsRouter from './routes/rooms.routes';
+import messagesRouter from './routes/messages.routes';
+import drawingRouter from './routes/drawing.routes';
 
 // Load environment variables
 dotenv.config();

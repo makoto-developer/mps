@@ -2,10 +2,10 @@
 # Run `mise install` to install all tools
 
 [tools]
-node = "20"
-erlang = "26.2"
-elixir = "1.15"
-rust = "1.75"
+node = "22"
+erlang = "27"
+elixir = "1.18-otp-27"
+rust = "1.83"
 
 [env]
 # Default environment variables
@@ -24,11 +24,8 @@ run = """
 set -e
 echo "📦 Installing dependencies..."
 
-# Frontend
+# Frontend (includes API routes)
 cd frontend && npm install && cd ..
-
-# Backend
-cd backend && npm install && cd ..
 
 # Phoenix
 cd phoenix && mix deps.get && cd ..
@@ -110,39 +107,32 @@ docker-compose ps
 # ===========================================
 
 [tasks.dev]
-description = "Start development servers (Frontend + Backend)"
+description = "Start development server (Next.js with API routes)"
 run = """
 #!/usr/bin/env bash
 set -e
 mkdir -p logs
 
-echo "🚀 Starting development servers..."
+echo "🚀 Starting development server..."
 echo ""
 
-# Start backend
-cd backend && PORT=22301 npm run dev >> ../logs/backend.log 2>&1 &
-echo "  Backend starting on port 22301..."
-
-# Start frontend
+# Start frontend (includes API routes)
 cd frontend && npm run dev >> ../logs/frontend.log 2>&1 &
-echo "  Frontend starting on port 22300..."
+echo "  App starting on port 22300..."
 
 echo ""
-echo "✅ Development servers started!"
+echo "✅ Development server started!"
 echo ""
-echo "  Frontend: http://localhost:22300"
-echo "  Backend:  http://localhost:22301"
+echo "  App:      http://localhost:22300"
+echo "  API:      http://localhost:22300/api"
+echo "  Phoenix:  http://localhost:22303 (Docker)"
 echo ""
-echo "  Logs: ./logs/frontend.log, ./logs/backend.log"
+echo "  Logs: ./logs/frontend.log"
 """
 
 [tasks.dev-frontend]
 description = "Start frontend development server"
 run = "cd frontend && npm run dev"
-
-[tasks.dev-backend]
-description = "Start backend development server"
-run = "cd backend && PORT=22301 npm run dev"
 
 [tasks.dev-phoenix]
 description = "Start Phoenix development server"
@@ -263,11 +253,8 @@ run = """
 #!/usr/bin/env bash
 echo "📋 Recent logs..."
 echo ""
-echo "=== Frontend ==="
-tail -20 logs/frontend.log 2>/dev/null || echo "No frontend logs"
-echo ""
-echo "=== Backend ==="
-tail -20 logs/backend.log 2>/dev/null || echo "No backend logs"
+echo "=== App ==="
+tail -20 logs/frontend.log 2>/dev/null || echo "No app logs"
 echo ""
 echo "=== Phoenix ==="
 docker-compose logs --tail=20 phoenix 2>/dev/null || echo "Phoenix not running"
@@ -324,7 +311,6 @@ run = """
 echo "🧹 Cleaning..."
 rm -rf generated dist node_modules
 rm -rf frontend/node_modules frontend/.next
-rm -rf backend/node_modules backend/dist
 rm -rf phoenix/_build phoenix/deps
 rm -rf logs/*.log
 echo "✅ Cleaned"
@@ -359,6 +345,13 @@ run = """
 echo "🏥 Health Check"
 echo ""
 
+# App API
+if curl -s http://localhost:22300/api/health > /dev/null 2>&1; then
+    echo "✅ App API: healthy"
+else
+    echo "❌ App API: not responding"
+fi
+
 # Phoenix
 if curl -s http://localhost:22303/api/health > /dev/null 2>&1; then
     echo "✅ Phoenix: healthy"
@@ -373,3 +366,20 @@ else
     echo "❌ PostgreSQL: not responding"
 fi
 """
+
+# ===========================================
+# Database
+# ===========================================
+
+[tasks.db-migrate]
+description = "Run database migrations"
+run = """
+#!/usr/bin/env bash
+set -e
+cd frontend && npx prisma migrate dev
+echo "✅ Migrations completed"
+"""
+
+[tasks.db-studio]
+description = "Open Prisma Studio"
+run = "cd frontend && npx prisma studio"

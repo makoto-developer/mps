@@ -399,10 +399,10 @@ protocol MPSBinaryFormat {
 **mise がインストールする言語:**
 | 言語 | バージョン |
 |-----|-----------|
-| Node.js | 20 |
-| Elixir | 1.15 |
-| Erlang | 26.2 |
-| Rust | 1.75 |
+| Node.js | 22 |
+| Elixir | 1.18 |
+| Erlang | 27 |
+| Rust | 1.83 |
 
 ### 起動手順
 
@@ -430,11 +430,42 @@ curl http://localhost:22303/api/health
 
 | ポート | サービス |
 |-------|---------|
-| 22301 | Backend (Express) |
+| 22300 | Next.js (Frontend + API) |
 | 22302 | PostgreSQL |
 | 22303 | Phoenix Signaling |
-| 22304 | TURN Server |
+| 22304 | TURN Server (coturn) |
 | 22305 | PGAdmin |
+
+### coturn（TURNサーバー）とは
+
+**TURN (Traversal Using Relays around NAT)** は、NAT/ファイアウォール越しにP2P通信を可能にするプロトコルです。
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  通常のP2P（NAT内同士は通信できない）                          │
+│                                                              │
+│   [User A]  ──✕──  [NAT/FW]  ──✕──  [User B]                │
+│    (自宅)           (ISP)           (会社)                   │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  TURNサーバー経由（NAT越え成功）                              │
+│                                                              │
+│   [User A] ──► [TURN Server] ◄── [User B]                   │
+│              (パブリックIP)                                  │
+│                    │                                         │
+│              リレー経由で通信                                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**なぜ必要か:**
+- WebRTCでP2P接続する際、NAT越えが必要
+- STUN（穴あけ）で失敗した場合のフォールバック
+- 約10-15%の接続でTURNが必要になる
+
+**coturn:**
+- オープンソースのTURN/STUNサーバー実装
+- 本番環境では専用サーバーまたはクラウドサービス推奨
 
 ### mise コマンド
 
@@ -455,14 +486,43 @@ mise tasks            # 全コマンド一覧
 
 ```
 mps/
-├── frontend/           # Next.js フロントエンド
-├── phoenix/            # Phoenix シグナリングサーバー
-│   ├── lib/mbf/        # MBF Elixir モジュール
-│   └── native/mbf_nif/ # Rust NIF
-├── backend/            # Express バックエンド（生成先）
-├── mps-protocol/       # MPS プロトコル定義
-├── docs/               # ドキュメント
-└── docker-compose.yml
+├── frontend/              # Next.js アプリ（UI + API）
+│   ├── app/               # App Router
+│   │   └── api/           # API Routes
+│   ├── components/        # React コンポーネント
+│   ├── lib/               # ユーティリティ
+│   └── prisma/            # データベーススキーマ
+│
+├── phoenix/               # Phoenix シグナリングサーバー
+│   ├── lib/               # Elixir ソース
+│   │   ├── signaling/     # WebSocket シグナリング
+│   │   └── mbf/           # MBF Elixir モジュール
+│   └── native/mbf_nif/    # Rust NIF（高速バイナリ処理）
+│
+├── mps-workspace/         # MPS プロジェクト
+│   ├── languages/         # DSL 言語定義
+│   ├── solutions/         # DSL ソリューション
+│   ├── generator/         # コードジェネレータ
+│   └── examples/          # 使用例
+│
+├── mps-protocol/          # プロトコル定義
+│
+├── docker/                # Docker ビルド設定
+│   ├── Dockerfile.app     # アプリケーション用
+│   └── Dockerfile.generator # ジェネレータ用
+│
+├── coturn/                # TURN サーバー設定
+│   └── turnserver.conf
+│
+├── docs/                  # ドキュメント
+│   ├── mbf-architecture.md
+│   ├── drawing-app-dsl-design.md
+│   ├── drawing-app-dsl-implementation-guide.md
+│   ├── DEPLOYMENT.md
+│   └── QUICK_REFERENCE.md
+│
+├── mise.toml              # 言語バージョン・タスク定義
+└── docker-compose.yml     # Docker Compose 設定
 ```
 
 ---
@@ -491,4 +551,5 @@ mps/
 - [MBFアーキテクチャ](docs/mbf-architecture.md)
 - [DSL設計書](docs/drawing-app-dsl-design.md)
 - [実装ガイド](docs/drawing-app-dsl-implementation-guide.md)
-- [デプロイメント](DEPLOYMENT.md)
+- [デプロイメント](docs/DEPLOYMENT.md)
+- [クイックリファレンス](docs/QUICK_REFERENCE.md)

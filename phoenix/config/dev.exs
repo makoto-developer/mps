@@ -1,6 +1,7 @@
 import Config
 
 config :signaling, SignalingWeb.Endpoint,
+  adapter: Bandit.PhoenixAdapter,
   http: [ip: {0, 0, 0, 0}, port: String.to_integer(System.get_env("PHX_PORT") || "22303")],
   check_origin: false,
   code_reloader: false,

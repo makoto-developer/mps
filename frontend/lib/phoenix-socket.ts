@@ -1,4 +1,5 @@
 import { Socket, Channel } from 'phoenix'
+import type { DrawingTool } from '@/types'
 
 const PHOENIX_URL = process.env.NEXT_PUBLIC_PHOENIX_URL || 'ws://localhost:22303/socket'
 
@@ -9,11 +10,17 @@ export interface Stroke {
   id: string
   room_id: string
   user_id: string
-  tool: string
+  userId?: string
+  tool: DrawingTool
   color: string
   width: number
   points: Array<{ x: number; y: number }>
   created_at: number
+  createdAt?: string | Date
+  user: {
+    id: string
+    nickname: string
+  }
 }
 
 export interface LiveStroke {

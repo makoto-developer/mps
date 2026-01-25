@@ -30,7 +30,8 @@ defmodule Signaling.MixProject do
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.6"},
       {:cors_plug, "~> 3.0"},
-      {:uuid, "~> 1.1"}
+      {:uuid, "~> 1.1"},
+      {:rustler, "~> 0.31.0"}
     ]
   end
 

@@ -26,10 +26,10 @@ interface Stroke {
   }
 }
 
+// 他ユーザーが描画中のストローク
 interface LiveStroke {
-  odStrokeId: string
+visibleStrokeId: string
   odUserId: string
-  tool: string
   color: string
   width: number
   points: Point[]
@@ -38,66 +38,26 @@ interface LiveStroke {
 export function DrawingCanvas({ roomId, currentUser }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
-  const [currentStroke, setCurrentStroke] = useState<Point[]>([])
   const [color, setColor] = useState('#000000')
   const [width, setWidth] = useState(3)
-  const [tool, _setTool] = useState('pen')
+  const [tool] = useState('pen')
   const [strokes, setStrokes] = useState<Stroke[]>([])
   const [loading, setLoading] = useState(false)
 
-  // Use ref for live strokes to avoid re-render loops
+  // Refs for real-time sync
   const liveStrokesRef = useRef<Map<string, LiveStroke>>(new Map())
   const currentStrokeIdRef = useRef<string>('')
+  const currentStrokePointsRef = useRef<Point[]>([])
   const strokesRef = useRef<Stroke[]>([])
-  const currentStrokeRef = useRef<Point[]>([])
-  const currentColorRef = useRef<string>('#000000')
-  const currentWidthRef = useRef<number>(3)
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Keep refs in sync
+  // Sync interval (ms)
+  const SYNC_INTERVAL = 50
+
+  // Keep strokes ref in sync
   useEffect(() => {
     strokesRef.current = strokes
   }, [strokes])
-
-  useEffect(() => {
-    currentStrokeRef.current = currentStroke
-  }, [currentStroke])
-
-  useEffect(() => {
-    currentColorRef.current = color
-  }, [color])
-
-  useEffect(() => {
-    currentWidthRef.current = width
-  }, [width])
-
-  // Draw a single stroke on canvas (incremental)
-  const drawStrokeOnCanvas = useCallback((
-    ctx: CanvasRenderingContext2D,
-    points: Point[],
-    strokeColor: string,
-    strokeWidth: number,
-    startIndex: number = 0
-  ) => {
-    if (points.length < 2) return
-
-    ctx.strokeStyle = strokeColor
-    ctx.lineWidth = strokeWidth
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-
-    const start = Math.max(0, startIndex)
-    if (start === 0) {
-      ctx.beginPath()
-      ctx.moveTo(points[0].x, points[0].y)
-    }
-
-    for (let i = Math.max(1, start); i < points.length; i++) {
-      ctx.beginPath()
-      ctx.moveTo(points[i - 1].x, points[i - 1].y)
-      ctx.lineTo(points[i].x, points[i].y)
-      ctx.stroke()
-    }
-  }, [])
 
   // Full canvas redraw
   const redrawCanvas = useCallback(() => {
@@ -116,20 +76,52 @@ export function DrawingCanvas({ roomId, currentUser }: DrawingCanvasProps) {
         : stroke.points
 
       if (points.length < 2) return
-      drawStrokeOnCanvas(ctx, points, stroke.color, stroke.width)
+
+      ctx.strokeStyle = stroke.color
+      ctx.lineWidth = stroke.width
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+
+      ctx.beginPath()
+      ctx.moveTo(points[0].x, points[0].y)
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y)
+      }
+      ctx.stroke()
     })
 
     // Draw live strokes from other users
     liveStrokesRef.current.forEach((liveStroke) => {
       if (liveStroke.points.length < 2) return
-      drawStrokeOnCanvas(ctx, liveStroke.points, liveStroke.color, liveStroke.width)
+
+      ctx.strokeStyle = liveStroke.color
+      ctx.lineWidth = liveStroke.width
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+
+      ctx.beginPath()
+      ctx.moveTo(liveStroke.points[0].x, liveStroke.points[0].y)
+      for (let i = 1; i < liveStroke.points.length; i++) {
+        ctx.lineTo(liveStroke.points[i].x, liveStroke.points[i].y)
+      }
+      ctx.stroke()
     })
 
     // Draw current stroke (self)
-    if (currentStrokeRef.current.length >= 2) {
-      drawStrokeOnCanvas(ctx, currentStrokeRef.current, currentColorRef.current, currentWidthRef.current)
+    if (currentStrokePointsRef.current.length >= 2) {
+      ctx.strokeStyle = color
+      ctx.lineWidth = width
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+
+      ctx.beginPath()
+      ctx.moveTo(currentStrokePointsRef.current[0].x, currentStrokePointsRef.current[0].y)
+      for (let i = 1; i < currentStrokePointsRef.current.length; i++) {
+        ctx.lineTo(currentStrokePointsRef.current[i].x, currentStrokePointsRef.current[i].y)
+      }
+      ctx.stroke()
     }
-  }, [drawStrokeOnCanvas])
+  }, [color, width])
 
   const loadStrokes = useCallback(async () => {
     if (!roomId) return
@@ -155,36 +147,44 @@ export function DrawingCanvas({ roomId, currentUser }: DrawingCanvasProps) {
     }
   }
 
+  // Send current stroke points to other users
+  const syncStrokePoints = useCallback(() => {
+    if (!currentStrokeIdRef.current || currentStrokePointsRef.current.length === 0) return
+
+    const socket = getSocket()
+    console.log('[DEBUG] syncStrokePoints - connected:', socket.connected, 'points:', currentStrokePointsRef.current.length)
+    if (socket.connected) {
+      socket.emit('stroke-sync', {
+        roomId,
+        strokeId: currentStrokeIdRef.current,
+        odUserId: currentUser?.id,
+        color,
+        width,
+        points: currentStrokePointsRef.current,
+      })
+    }
+  }, [roomId, currentUser, color, width])
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!currentUser) return
 
     e.preventDefault()
     const pos = getMousePos(e)
     setIsDrawing(true)
-    setCurrentStroke([pos])
-    currentStrokeRef.current = [pos]
 
     const strokeId = `${currentUser.id}-${Date.now()}`
     currentStrokeIdRef.current = strokeId
+    currentStrokePointsRef.current = [pos]
 
-    const socket = getSocket()
-    if (socket.connected) {
-      socket.emit('stroke-start', {
-        roomId,
-        strokeId,
-        userId: currentUser.id,
-        tool,
-        color,
-        width,
-        point: pos,
-      })
-    }
+    // Start sync interval
+    syncIntervalRef.current = setInterval(() => {
+      syncStrokePoints()
+    }, SYNC_INTERVAL)
 
-    const ctx = canvasRef.current?.getContext('2d')
-    if (ctx) {
-      ctx.beginPath()
-      ctx.moveTo(pos.x, pos.y)
-    }
+    // Initial sync
+    syncStrokePoints()
+
+    redrawCanvas()
   }
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -193,52 +193,39 @@ export function DrawingCanvas({ roomId, currentUser }: DrawingCanvasProps) {
     e.preventDefault()
     const pos = getMousePos(e)
 
-    setCurrentStroke((prev) => {
-      const newStroke = [...prev, pos]
-      currentStrokeRef.current = newStroke
-      return newStroke
-    })
-
-    const socket = getSocket()
-    if (socket.connected && currentStrokeIdRef.current) {
-      socket.emit('stroke-point', {
-        roomId,
-        strokeId: currentStrokeIdRef.current,
-        point: pos,
-      })
-    }
-
-    const ctx = canvasRef.current?.getContext('2d')
-    if (ctx) {
-      ctx.strokeStyle = color
-      ctx.lineWidth = width
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-      ctx.lineTo(pos.x, pos.y)
-      ctx.stroke()
-    }
+    currentStrokePointsRef.current = [...currentStrokePointsRef.current, pos]
+    redrawCanvas()
   }
 
   const endDrawing = async () => {
-    if (!isDrawing || !currentUser || currentStroke.length < 2) {
+    if (!isDrawing || !currentUser) {
       setIsDrawing(false)
-      setCurrentStroke([])
-      currentStrokeRef.current = []
-      currentStrokeIdRef.current = ''
       return
     }
 
-    setIsDrawing(false)
-    const strokeId = currentStrokeIdRef.current
-    const finalPoints = [...currentStroke]
-    currentStrokeIdRef.current = ''
+    // Stop sync interval
+    if (syncIntervalRef.current) {
+      clearInterval(syncIntervalRef.current)
+      syncIntervalRef.current = null
+    }
 
+    setIsDrawing(false)
+
+    const finalPoints = [...currentStrokePointsRef.current]
+    const strokeId = currentStrokeIdRef.current
+
+    // Notify stroke end
     const socket = getSocket()
     if (socket.connected && strokeId) {
-      socket.emit('stroke-end', {
-        roomId,
-        strokeId,
-      })
+      socket.emit('stroke-end', { roomId, strokeId })
+    }
+
+    currentStrokeIdRef.current = ''
+    currentStrokePointsRef.current = []
+
+    if (finalPoints.length < 2) {
+      redrawCanvas()
+      return
     }
 
     try {
@@ -250,15 +237,14 @@ export function DrawingCanvas({ roomId, currentUser }: DrawingCanvasProps) {
       })
 
       if (socket.connected) {
-        socket.emit('draw-stroke', {
+        socket.emit('stroke-complete', {
           roomId,
           stroke: response.stroke,
         })
       }
 
       setStrokes((prev) => [...prev, response.stroke])
-      setCurrentStroke([])
-      currentStrokeRef.current = []
+      redrawCanvas()
     } catch (err) {
       console.error('Failed to save stroke:', err)
     }
@@ -276,21 +262,11 @@ export function DrawingCanvas({ roomId, currentUser }: DrawingCanvasProps) {
     try {
       await apiClient.clearStrokes(roomId)
 
-      // Clear local state
       setStrokes([])
       strokesRef.current = []
       liveStrokesRef.current.clear()
+      redrawCanvas()
 
-      // Clear canvas immediately
-      const canvas = canvasRef.current
-      if (canvas) {
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height)
-        }
-      }
-
-      // Notify other users
       const socket = getSocket()
       if (socket.connected) {
         socket.emit('canvas-clear', { roomId })
@@ -303,62 +279,65 @@ export function DrawingCanvas({ roomId, currentUser }: DrawingCanvasProps) {
     }
   }
 
-  // Socket event handlers - setup once
+  // Socket event handlers
   useEffect(() => {
+    console.log('[DEBUG] useEffect - roomId:', roomId, 'currentUser:', currentUser?.id)
     if (!roomId || !currentUser) return
 
     loadStrokes()
 
     const socket = getSocket()
-    socket.connect()
-    socket.emit('join-room', roomId)
+    console.log('[DEBUG] getSocket - id:', socket.id, 'connected:', socket.connected)
 
-    // Other user started drawing
-    const handleStrokeStarted = (data: { strokeId: string; userId: string; tool: string; color: string; width: number; point: Point }) => {
-      if (data.userId === currentUser.id) return
-
-      liveStrokesRef.current.set(data.strokeId, {
-        odStrokeId: data.strokeId,
-        odUserId: data.userId,
-        tool: data.tool,
-        color: data.color,
-        width: data.width,
-        points: [data.point],
-      })
+    const joinRoom = () => {
+      console.log('[DEBUG] joinRoom called, socket.connected:', socket.connected)
+      socket.emit('join-room', roomId)
+      console.log('[DEBUG] join-room emitted for room:', roomId)
     }
 
-    // Other user is drawing (point by point)
-    const handleStrokePointed = (data: { strokeId: string; point: Point }) => {
-      const liveStroke = liveStrokesRef.current.get(data.strokeId)
-      if (!liveStroke) return
+    // Wait for connection before joining room
+    socket.on('connect', () => {
+      console.log('[DEBUG] socket connect event fired')
+      joinRoom()
+    })
 
-      const prevPoints = liveStroke.points
-      liveStroke.points = [...prevPoints, data.point]
-      liveStrokesRef.current.set(data.strokeId, liveStroke)
+    if (socket.connected) {
+      console.log('[DEBUG] socket already connected, joining room directly')
+      joinRoom()
+    } else {
+      console.log('[DEBUG] socket not connected, calling connect()')
+      socket.connect()
+    }
 
-      // Draw the new segment immediately
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
+    // Receive stroke sync from other users (point collection)
+    const handleStrokeSync = (data: {
+      strokeId: string
+      odUserId: string
+      color: string
+      width: number
+      points: Point[]
+    }) => {
+      if (data.odUserId === currentUser.id) return
 
-      ctx.strokeStyle = liveStroke.color
-      ctx.lineWidth = liveStroke.width
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-      ctx.beginPath()
-      ctx.moveTo(prevPoints[prevPoints.length - 1].x, prevPoints[prevPoints.length - 1].y)
-      ctx.lineTo(data.point.x, data.point.y)
-      ctx.stroke()
+      liveStrokesRef.current.set(data.strokeId, {
+        visibleStrokeId: data.strokeId,
+        odUserId: data.odUserId,
+        color: data.color,
+        width: data.width,
+        points: data.points,
+      })
+
+      redrawCanvas()
     }
 
     // Other user finished drawing
-    const handleStrokeEnded = (data: { strokeId: string }) => {
+    const handleStrokeEnd = (data: { strokeId: string }) => {
       liveStrokesRef.current.delete(data.strokeId)
+      redrawCanvas()
     }
 
-    // Completed stroke received (for persistence)
-    const handleStrokeDrawn = (stroke: Stroke) => {
+    // Completed stroke received
+    const handleStrokeComplete = (stroke: Stroke) => {
       // Remove from live strokes
       liveStrokesRef.current.forEach((_, key) => {
         if (key.startsWith(stroke.user?.id || '')) {
@@ -371,38 +350,35 @@ export function DrawingCanvas({ roomId, currentUser }: DrawingCanvasProps) {
         strokesRef.current = updated
         return updated
       })
+
+      redrawCanvas()
     }
 
-    // Canvas cleared by another user
+    // Canvas cleared
     const handleCanvasCleared = () => {
       setStrokes([])
       strokesRef.current = []
       liveStrokesRef.current.clear()
-
-      const canvas = canvasRef.current
-      if (canvas) {
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height)
-        }
-      }
+      redrawCanvas()
     }
 
-    socket.on('stroke-started', handleStrokeStarted)
-    socket.on('stroke-pointed', handleStrokePointed)
-    socket.on('stroke-ended', handleStrokeEnded)
-    socket.on('stroke-drawn', handleStrokeDrawn)
+    socket.on('stroke-synced', handleStrokeSync)
+    socket.on('stroke-ended', handleStrokeEnd)
+    socket.on('stroke-completed', handleStrokeComplete)
     socket.on('canvas-cleared', handleCanvasCleared)
 
     return () => {
       socket.emit('leave-room', roomId)
-      socket.off('stroke-started', handleStrokeStarted)
-      socket.off('stroke-pointed', handleStrokePointed)
-      socket.off('stroke-ended', handleStrokeEnded)
-      socket.off('stroke-drawn', handleStrokeDrawn)
+      socket.off('stroke-synced', handleStrokeSync)
+      socket.off('stroke-ended', handleStrokeEnd)
+      socket.off('stroke-completed', handleStrokeComplete)
       socket.off('canvas-cleared', handleCanvasCleared)
+
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current)
+      }
     }
-  }, [roomId, currentUser, loadStrokes])
+  }, [roomId, currentUser, loadStrokes, redrawCanvas])
 
   // Canvas setup
   useEffect(() => {

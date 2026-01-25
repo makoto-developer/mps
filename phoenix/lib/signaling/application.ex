@@ -10,6 +10,8 @@ defmodule Signaling.Application do
       {Phoenix.PubSub, name: Signaling.PubSub},
       {Registry, keys: :unique, name: Signaling.RoomRegistry},
       {DynamicSupervisor, name: Signaling.RoomSupervisor, strategy: :one_for_one},
+      # ETS-based stroke storage
+      Signaling.StrokeStore,
       SignalingWeb.Endpoint
     ]
 

@@ -9,7 +9,10 @@ defmodule SignalingWeb.Endpoint do
   ]
 
   socket "/socket", SignalingWeb.UserSocket,
-    websocket: [timeout: 45_000],
+    websocket: [
+      timeout: 45_000,
+      check_origin: ["//localhost:22300", "//localhost:3000", "//localhost:3001"]
+    ],
     longpoll: false
 
   plug Plug.RequestId
@@ -25,7 +28,7 @@ defmodule SignalingWeb.Endpoint do
   plug Plug.Session, @session_options
 
   plug CORSPlug,
-    origin: ["http://localhost:3001", "http://localhost:3000"],
+    origin: ["http://localhost:22300", "http://localhost:3000", "http://localhost:3001"],
     methods: ["GET", "POST", "OPTIONS"],
     headers: ["Authorization", "Content-Type"]
 

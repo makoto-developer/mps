@@ -1,4 +1,5 @@
 export { DrawingCanvas } from './DrawingCanvas'
+export { PhoenixDrawingCanvas } from './PhoenixDrawingCanvas'
 export type { DrawingCanvasHandle } from './DrawingCanvas'
 export { DrawingToolbar } from './DrawingToolbar'
 export { ColorPicker } from './ColorPicker'

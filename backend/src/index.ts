@@ -70,6 +70,7 @@ io.on('connection', (socket) => {
 
   // Join room
   socket.on('join-room', (roomId: string) => {
+    console.log(`[DEBUG] join-room received from ${socket.id} for room ${roomId}`);
     socket.join(roomId);
     console.log(`👤 Socket ${socket.id} joined room ${roomId}`);
     socket.to(roomId).emit('user-joined', { socketId: socket.id });
@@ -82,23 +83,15 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('user-left', { socketId: socket.id });
   });
 
-  // Real-time drawing - stroke start
-  socket.on('stroke-start', (data: { roomId: string; strokeId: string; userId: string; tool: string; color: string; width: number; point: { x: number; y: number } }) => {
-    socket.to(data.roomId).emit('stroke-started', {
+  // Real-time drawing - sync stroke points (point collection)
+  socket.on('stroke-sync', (data: { roomId: string; strokeId: string; odUserId: string; color: string; width: number; points: Array<{ x: number; y: number }> }) => {
+    console.log(`🎨 stroke-sync: ${data.strokeId} (${data.points.length} points) -> room ${data.roomId}`);
+    socket.to(data.roomId).emit('stroke-synced', {
       strokeId: data.strokeId,
-      userId: data.userId,
-      tool: data.tool,
+      odUserId: data.odUserId,
       color: data.color,
       width: data.width,
-      point: data.point,
-    });
-  });
-
-  // Real-time drawing - stroke point (during drawing)
-  socket.on('stroke-point', (data: { roomId: string; strokeId: string; point: { x: number; y: number } }) => {
-    socket.to(data.roomId).emit('stroke-pointed', {
-      strokeId: data.strokeId,
-      point: data.point,
+      points: data.points,
     });
   });
 
@@ -109,9 +102,22 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Completed stroke (for persistence)
-  socket.on('draw-stroke', (data: { roomId: string; stroke: any }) => {
-    socket.to(data.roomId).emit('stroke-drawn', data.stroke);
+  // Completed stroke (for persistence) with ACK
+  socket.on('stroke-complete', (data: { roomId: string; stroke: any; messageId?: string }) => {
+    const messageId = data.messageId || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Broadcast to other users in the room
+    socket.to(data.roomId).emit('stroke-completed', {
+      ...data.stroke,
+      messageId,
+    });
+
+    // Send ACK back to sender
+    socket.emit('stroke-complete-ack', {
+      messageId,
+      strokeId: data.stroke?.id,
+      success: true,
+    });
   });
 
   // Canvas cleared

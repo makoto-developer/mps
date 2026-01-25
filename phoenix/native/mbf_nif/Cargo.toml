@@ -1,0 +1,13 @@
+[package]
+name = "mbf_nif"
+version = "0.1.0"
+edition = "2021"
+authors = ["MPS Drawing App"]
+description = "High-performance MBF binary protocol encoder/decoder for Elixir"
+
+[lib]
+name = "mbf_nif"
+crate-type = ["cdylib"]
+
+[dependencies]
+rustler = "0.31"

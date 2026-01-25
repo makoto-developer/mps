@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui'
-import { DrawingCanvas, DrawingToolbar } from '@/components/drawing'
+import { PhoenixDrawingCanvas, DrawingToolbar } from '@/components/drawing'
 import type { DrawingCanvasHandle } from '@/components/drawing'
 import { ChatPanel } from '@/components/chat'
 import { apiClient } from '@/lib/api-client'
@@ -247,7 +247,7 @@ export default function DrawingRoomPage() {
       <div className="flex-1 flex px-4 pb-4 gap-4 min-h-0">
         {/* Canvas */}
         <div className="flex-1 min-w-0">
-          <DrawingCanvas
+          <PhoenixDrawingCanvas
             ref={canvasRef}
             roomId={roomId}
             color={color}

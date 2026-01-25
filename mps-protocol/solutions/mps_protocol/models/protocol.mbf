@@ -1,0 +1,67 @@
+// MBF Protocol Definition (DSL Format)
+// This is a human-readable representation of the MPS model
+// The actual MPS model would be in XML, but this serves as reference
+
+protocol MBF {
+  magic = "MP"    // 0x4D, 0x50
+  version = 1
+
+  // ============================================
+  // Custom Types
+  // ============================================
+
+  type Point {
+    x: u16
+    y: u16
+  }
+
+  type Color {
+    r: u8
+    g: u8
+    b: u8
+  }
+
+  type StrokeId {
+    user_hash: u32
+    timestamp: u32
+  }
+
+  // ============================================
+  // Message Types
+  // ============================================
+
+  message StrokeSync = 0x10 {
+    stroke_id: StrokeId
+    color: Color
+    width: u8
+    points: Point[]  // length prefix: u16
+  }
+
+  message StrokeEnd = 0x11 {
+    stroke_id: StrokeId
+  }
+
+  message StrokeComplete = 0x12 {
+    message_id: u64
+    tool: u8
+    color: Color
+    width: u8
+    timestamp: u64
+    points: Point[]  // length prefix: u16
+  }
+
+  message StrokeAck = 0x13 {
+    message_id: u64
+    stroke_id: StrokeId
+    success: bool
+  }
+
+  message CanvasClear = 0x20 {
+    timestamp: u64
+  }
+
+  message RoomState = 0x30 {
+    strokes: StrokeComplete[]  // length prefix: u16
+    live_strokes: StrokeSync[] // length prefix: u16
+  }
+}

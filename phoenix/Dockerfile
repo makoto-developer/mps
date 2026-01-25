@@ -1,7 +1,8 @@
 # Build stage
 FROM elixir:1.15-alpine AS builder
 
-RUN apk add --no-cache build-base git
+# Install build dependencies including Rust
+RUN apk add --no-cache build-base git rust cargo
 
 WORKDIR /app
 
@@ -16,6 +17,7 @@ RUN mix deps.compile
 
 COPY config ./config
 COPY lib ./lib
+COPY native ./native
 
 RUN mix compile
 RUN mix release
@@ -23,7 +25,7 @@ RUN mix release
 # Release stage
 FROM alpine:3.18 AS runner
 
-RUN apk add --no-cache libstdc++ openssl ncurses-libs wget
+RUN apk add --no-cache libstdc++ openssl ncurses-libs wget libgcc
 
 WORKDIR /app
 

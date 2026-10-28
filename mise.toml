@@ -2,9 +2,9 @@
 # Run `mise install` to install all tools
 
 [tools]
-node = "22"
-erlang = "27"
-elixir = "1.18-otp-27"
+node = "24"
+erlang = "29"
+elixir = "1.20.4-otp-29"
 rust = "1.83"
 
 [env]

@@ -1,5 +1,5 @@
 # Build stage
-FROM elixir:1.15-alpine AS builder
+FROM elixir:1.20.4-otp-29-alpine AS builder
 
 # Install build dependencies including Rust
 RUN apk add --no-cache build-base git rust cargo
@@ -23,7 +23,8 @@ RUN mix compile
 RUN mix release
 
 # Release stage
-FROM alpine:3.18 AS runner
+# Must track the builder's base Alpine (3.24 as of 2026-10-28) or the release loses its libs.
+FROM alpine:3.24 AS runner
 
 RUN apk add --no-cache libstdc++ openssl ncurses-libs wget libgcc
 
